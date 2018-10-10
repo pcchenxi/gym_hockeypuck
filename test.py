@@ -3,6 +3,7 @@ import gym_hockeypuck
 import numpy as np
 
 env = gym.make('hockeypuck-v0')
+env.seed()
 print (env.action_space)
 # for _ in range(30):
 #     env.reset()
