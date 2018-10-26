@@ -20,13 +20,15 @@ class HockeypuckEnv(gym.Env):
 #   metadata = {'render.modes': ['human']}
     def compute_reward(self, action, init_puck_pos, good_dir, data):
         done = False
-        speed_reward = 0
-        force_reward = np.sqrt(np.sum(action*action))
         puck_pos = np.array(data['puck_pos'])
         puck_pos2 = np.array(data['puck2_pos'])
         blade_pos = np.array(data['blade_pos'])
+        joint_torque = np.array(data['joint_torque'])
         # print(blade_pos)
 
+        speed_reward = 0
+        force_reward = np.sqrt(np.sum(action*action))*0.1
+        
         dist_diff = (puck_pos - init_puck_pos)[:2]
         dist_moved = np.sqrt(np.sum(dist_diff*dist_diff))     
 
@@ -36,14 +38,19 @@ class HockeypuckEnv(gym.Env):
         diff_blade_puck = (blade_pos - puck_pos)
         dist_blade_puck = np.sqrt(np.sum(diff_blade_puck*diff_blade_puck))   
 
+        diff_puck_puck = (puck_pos2 - puck_pos)
+        dist_puck_puck = np.sqrt(np.sum(diff_puck_puck*diff_puck_puck))  
+
+        diff_puck1 = (puck_pos - self.puck_pos_pre)[:2]
+        speed_puck1 = np.sqrt(np.sum(diff_puck1*diff_puck1))  
+
         if dist_blade_puck < 0.2:
             dist_blade_puck = 0.2
 
         dist_reward = self.dist_pre - dist_blade_puck
         self.dist_pre = dist_blade_puck
+        self.puck_pos_pre = puck_pos
 
-        if self.show:
-            print(dist_reward)
 
         # if dist_moved > 0.01:
         #     # speed_reward = dist_moved
@@ -56,9 +63,16 @@ class HockeypuckEnv(gym.Env):
         #     done = True 
         #     speed_reward = -1
 
-        reward = [dist_reward - force_reward*0.01, speed_reward]
+        # reward = [dist_reward, speed_reward]
 
-        return reward, done
+
+        # if speed_puck1 > 0.01:
+        #    dist_reward = 0
+
+        if self.show:
+            print(dist_reward, speed_puck1)
+
+        return [-dist_blade_puck, speed_puck1*50, dist_reward+speed_reward-force_reward], done
 
 
     def convert_to_state(self, data):
@@ -127,14 +141,14 @@ class HockeypuckEnv(gym.Env):
 
         self.sim.init_controller(mode='JOINT_IMP_CTRL')
         self.sim.reset_to_home_pos()
-        self.sim.set_home_pos({'pos': [np.random.uniform(-1, 1) for i in range(7)]})
-        # self.sim.set_home_pos({'pos': [-0.889875, 0.751139, 0.0515551, -0.977962, 0.227244, -0.192762, 2.75731]})
+        # self.sim.set_home_pos({'pos': [np.random.uniform(-3, 3) for i in range(7)]})
+        # self.sim.set_home_pos({'pos': [-0.889875, 0.751139, 0.0515551, -0.977962, 0.227244, -0.192762, 2.55731]})
 
-        puck_pos1 = np.asarray([np.random.uniform(-1, 1) for i in range(2)])*0.6
+        puck_pos1 = np.asarray([np.random.uniform(-1, 1) for i in range(2)])*0.3
         puck_pos2 = np.asarray([np.random.uniform(-1, 1) for i in range(2)])*0.2
 
-        self.sim.set_puck_pos({'pos': [-0+puck_pos1[0], 0+puck_pos1[1], 0.02762]})
-        self.sim.set_puck2_pos({'pos': [-0+puck_pos2[0], 0.8+puck_pos2[1], 0.02963]})
+        self.sim.set_puck_pos({'pos': [-0.5+puck_pos1[0], 0.0+puck_pos1[1], 0.02762]})
+        self.sim.set_puck2_pos({'pos': [-0.3+puck_pos2[0], 0.8+puck_pos2[1], 0.02963]})
 
         data = self.sim.get_full_data()
         state = self.convert_to_state(data)
@@ -148,6 +162,7 @@ class HockeypuckEnv(gym.Env):
         self.good_dir = puck2_dir/dist
         self.touch_puch = False
         self.dist_pre = dist
+        self.puck_pos_pre = self.init_puck_pos
 
         return state
 
